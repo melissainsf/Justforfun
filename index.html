@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customer Success KPIs</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #667085; --border: #e4e7ec;
+      --good: #12805c; --warn: #b54708; --bad: #c4320a; --accent: #3756d4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #111418; --card: #1a1e24; --text: #e8eaed; --muted: #98a2b3; --border: #2b313a;
+              --good: #3ccb8e; --warn: #f5a524; --bad: #f97066; --accent: #8098f9; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+    header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    h1 { font-size: 22px; margin: 0; }
+    .note { color: var(--muted); font-size: 12px; }
+    .grid { display: grid; gap: 16px; margin-bottom: 16px; }
+    .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 4px; }
+    .kpi { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+    .breakdown { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; font-variant-numeric: tabular-nums; }
+    .breakdown span:nth-child(even) { text-align: right; }
+    .breakdown .total { border-top: 1px solid var(--border); padding-top: 6px; font-weight: 600; }
+    .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .filters button { border: 1px solid var(--border); background: transparent; color: var(--text);
+                      padding: 4px 10px; border-radius: 999px; font-size: 12px; cursor: pointer; }
+    .filters button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .chart-wrap { position: relative; height: 420px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { font-size: 12px; color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+    th.num, td.num { text-align: right; }
+    .pill { display: inline-block; min-width: 38px; text-align: center; padding: 2px 8px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+    .pill.good { color: var(--good); background: color-mix(in srgb, var(--good) 15%, transparent); }
+    .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+    .pill.bad  { color: var(--bad);  background: color-mix(in srgb, var(--bad) 15%, transparent); }
+    .stale { color: var(--bad); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Customer Success KPIs</h1>
+    <span class="note">Sample data only — all customers and CSMs are fictional</span>
+  </header>
+
+  <section class="grid two">
+    <div class="card">
+      <h2>NRR</h2>
+      <div class="kpi" id="nrr"></div>
+      <div class="sub">Net revenue retention · trailing 12 months</div>
+      <div class="breakdown" id="nrr-breakdown"></div>
+    </div>
+    <div class="card">
+      <h2>GRR</h2>
+      <div class="kpi" id="grr"></div>
+      <div class="sub">Gross revenue retention · trailing 12 months</div>
+      <div class="breakdown" id="grr-breakdown"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <div class="chart-head"><h2>Industries by health score</h2><div class="filters" data-chart="industry"></div></div>
+      <div class="chart-wrap"><canvas id="industry-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="chart-head"><h2>Verticals by health score</h2><div class="filters" data-chart="vertical"></div></div>
+      <div class="chart-wrap"><canvas id="vertical-chart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="chart-head"><h2>Renewing in the next 90 days</h2><span class="note" id="renewal-summary"></span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-key="name">Customer</th>
+          <th data-key="csm">CSM</th>
+          <th data-key="health" class="num">Health score</th>
+          <th data-key="renewalDate">Renewal date</th>
+          <th data-key="currentArr" class="num">Contract value</th>
+          <th data-key="lastContact">Last contact</th>
+        </tr></thead>
+        <tbody id="renewals"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="data.js"></script>
+<script>
+  const { customers, today } = window.CS_DATA;
+  const money = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  const pct = (n) => (n * 100).toFixed(1) + "%";
+  const fmtDate = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const daysBetween = (a, b) => Math.round((b - a) / 86400000);
+
+  // ---- NRR / GRR ----
+  // Cohort = customers who had ARR twelve months ago. New logos are excluded.
+  //   NRR = (start + expansion - contraction - churn) / start
+  //   GRR = (start - contraction - churn) / start   (capped at 100% by definition)
+  const cohort = customers.filter((c) => c.startArr > 0);
+  let start = 0, expansion = 0, contraction = 0, churn = 0;
+  for (const c of cohort) {
+    start += c.startArr;
+    const delta = c.currentArr - c.startArr;
+    if (c.churned) churn += c.startArr;
+    else if (delta > 0) expansion += delta;
+    else contraction += -delta;
+  }
+  const nrr = (start + expansion - contraction - churn) / start;
+  const grr = (start - contraction - churn) / start;
+
+  const breakdown = (rows) => rows.map(([label, value, cls]) =>
+    `<span class="${cls || ""}">${label}</span><span class="${cls || ""}">${value}</span>`).join("");
+
+  document.getElementById("nrr").textContent = pct(nrr);
+  document.getElementById("grr").textContent = pct(grr);
+  document.getElementById("nrr-breakdown").innerHTML = breakdown([
+    ["Starting ARR", money(start)],
+    ["+ Expansion", money(expansion)],
+    ["− Contraction", money(contraction)],
+    ["− Churn", money(churn)],
+    ["Ending ARR (cohort)", money(start + expansion - contraction - churn), "total"],
+  ]);
+  document.getElementById("grr-breakdown").innerHTML = breakdown([
+    ["Starting ARR", money(start)],
+    ["− Contraction", money(contraction)],
+    ["− Churn", money(churn)],
+    ["Retained ARR", money(start - contraction - churn), "total"],
+  ]);
+
+  // ---- Pie charts ----
+  const active = customers.filter((c) => !c.churned);
+  const BANDS = {
+    all: { label: "All", test: () => true },
+    healthy: { label: "Healthy (75+)", test: (h) => h >= 75 },
+    neutral: { label: "Neutral (50–74)", test: (h) => h >= 50 && h < 75 },
+    risk: { label: "At risk (<50)", test: (h) => h < 50 },
+  };
+  const PALETTE = ["#3756d4", "#12a37a", "#e8913a", "#c4458f", "#7a5af8", "#2e90b8",
+                   "#d1495b", "#8a9a2b", "#9e6b3f", "#4c6ef5", "#0e9384", "#f79009",
+                   "#a15c9e", "#5d7a99", "#b93815", "#6172f3", "#3b7d23", "#c11574"];
+
+  const charts = {};
+  function renderPie(field, band) {
+    const groups = {};
+    for (const c of active) {
+      if (!BANDS[band].test(c.health)) continue;
+      (groups[c[field]] ||= []).push(c.health);
+    }
+    const labels = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+    const counts = labels.map((l) => groups[l].length);
+    const avgs = labels.map((l) => Math.round(groups[l].reduce((s, h) => s + h, 0) / groups[l].length));
+
+    charts[field]?.destroy();
+    charts[field] = new Chart(document.getElementById(`${field}-chart`), {
+      type: "pie",
+      data: {
+        labels: labels.map((l, i) => `${l} · avg ${avgs[i]}`),
+        datasets: [{ data: counts, backgroundColor: PALETTE, borderColor: getComputedStyle(document.body).backgroundColor, borderWidth: 2 }],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: labels.length > 8 ? "bottom" : "right", labels: { color: getComputedStyle(document.body).color, boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (ctx) => ` ${counts[ctx.dataIndex]} customers · avg health ${avgs[ctx.dataIndex]}` } },
+        },
+      },
+    });
+  }
+
+  document.querySelectorAll(".filters").forEach((el) => {
+    const field = el.dataset.chart;
+    el.innerHTML = Object.entries(BANDS).map(([k, b]) =>
+      `<button data-band="${k}" class="${k === "all" ? "active" : ""}">${b.label}</button>`).join(" ");
+    el.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      el.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+      renderPie(field, btn.dataset.band);
+    });
+    renderPie(field, "all");
+  });
+
+  // ---- Renewals in next 90 days ----
+  const horizon = new Date(today.getTime() + 90 * 86400000);
+  const renewals = active.filter((c) => c.renewalDate >= today && c.renewalDate <= horizon);
+  const healthClass = (h) => (h >= 75 ? "good" : h >= 50 ? "warn" : "bad");
+  let sort = { key: "renewalDate", dir: 1 };
+
+  function renderRenewals() {
+    const rows = [...renewals].sort((a, b) => {
+      const x = a[sort.key], y = b[sort.key];
+      return (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
+    });
+    document.getElementById("renewals").innerHTML = rows.map((c) => {
+      const since = daysBetween(c.lastContact, today);
+      return `<tr>
+        <td>${c.name}</td>
+        <td>${c.csm}</td>
+        <td class="num"><span class="pill ${healthClass(c.health)}">${c.health}</span></td>
+        <td>${fmtDate(c.renewalDate)} <span class="note">(${daysBetween(today, c.renewalDate)}d)</span></td>
+        <td class="num">${money(c.currentArr)}</td>
+        <td class="${since > 30 ? "stale" : ""}">${fmtDate(c.lastContact)} <span class="note">(${since}d ago)</span></td>
+      </tr>`;
+    }).join("");
+  }
+  document.querySelectorAll("th[data-key]").forEach((th) => th.addEventListener("click", () => {
+    sort = { key: th.dataset.key, dir: sort.key === th.dataset.key ? -sort.dir : 1 };
+    renderRenewals();
+  }));
+  const totalValue = renewals.reduce((s, c) => s + c.currentArr, 0);
+  document.getElementById("renewal-summary").textContent =
+    `${renewals.length} customers · ${money(totalValue)} up for renewal`;
+  renderRenewals();
+</script>
+</body>
+</html>
