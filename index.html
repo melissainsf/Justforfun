@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer Success Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f2;
+    --surface-1: #fcfcfb;
+    --border: #e3e2de;
+    --grid: #ecebe7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #7a7974;
+    --accent: #2a78d6;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #d03b3b;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111110;
+      --surface-1: #1a1a19;
+      --border: #2e2e2c;
+      --grid: #262624;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8e86;
+      --accent: #3987e5;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111110;
+    --surface-1: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #262624;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--text-secondary); font-size: 13px; }
+  .demo-tag {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px;
+  }
+
+  .tabs { display: flex; gap: 4px; margin: 20px 0 20px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab {
+    appearance: none; background: none; border: 0; cursor: pointer;
+    padding: 10px 14px; font: inherit; font-weight: 600; color: var(--text-secondary);
+    border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  .tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .card h2 { font-size: 14px; font-weight: 600; margin: 0; color: var(--text-secondary); }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .kpi-value { font-size: 44px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .kpi-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+  .delta-up { color: var(--text-primary); font-weight: 600; }
+  .delta-up::before { content: "▲ "; color: var(--good); font-size: 10px; }
+  .kpi-def { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+  .spark { width: 100%; height: 56px; margin-top: 14px; display: block; overflow: visible; }
+
+  .health { margin-top: 16px; }
+  .health-body { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 28px; align-items: center; margin-top: 12px; }
+  .pie-wrap { position: relative; width: 100%; max-width: 300px; margin: 0 auto; }
+  .pie-wrap svg { width: 100%; height: auto; display: block; }
+  .slice { cursor: pointer; transition: opacity .15s; }
+  .pie-wrap svg:hover .slice:not(:hover) { opacity: .45; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 9px 8px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+  tbody tr.hl { background: var(--grid); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 0; }
+  .st { display: inline-flex; align-items: center; gap: 4px; }
+  .st i { font-style: normal; font-size: 11px; }
+  .st-good i { color: var(--good); }
+  .st-warn i { color: var(--warning); }
+  .st-crit i { color: var(--critical); }
+  .score { font-weight: 600; }
+  .legend-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10; opacity: 0; transition: opacity .1s;
+    background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    min-width: 160px;
+  }
+  .tooltip b { display: block; margin-bottom: 4px; }
+  .tooltip .row { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); }
+  .tooltip .row span:last-child { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 760px) {
+    .kpi-row { grid-template-columns: 1fr; }
+    .health-body { grid-template-columns: 1fr; }
+    .kpi-value { font-size: 38px; }
+    th, td { padding: 8px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Customer Success Dashboard</h1>
+      <div class="sub">Trailing 12 months · as of Q3 FY26</div>
+    </div>
+    <span class="demo-tag">Demo data</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" aria-controls="tab-kpis" id="tab-kpis-btn">Overall KPIs</button>
+  </nav>
+
+  <section id="tab-kpis" role="tabpanel" aria-labelledby="tab-kpis-btn">
+    <div class="kpi-row" id="kpis"></div>
+
+    <div class="card health">
+      <h2>Customer health by stage</h2>
+      <div class="health-body">
+        <div class="pie-wrap" id="pie"></div>
+        <div>
+          <table id="health-table">
+            <thead>
+              <tr><th>Stage</th><th>Customers</th><th>Avg score</th><th>Healthy</th><th>At risk</th><th>Critical</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="legend-note">Slice size = share of customers. Health score 0–100: Healthy ≥ 70, At risk 40–69, Critical &lt; 40.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="tooltip" id="tip" role="tooltip"></div>
+
+<script>
+// All figures below are made up for demo purposes.
+const KPIS = [
+  {
+    key: "grr", title: "Gross Revenue Retention (GRR)", value: 92.4, prior: 91.1, target: 90,
+    def: "Starting ARR minus churn and contraction, divided by starting ARR. Excludes expansion; max 100%.",
+    trend: [89.8, 90.6, 91.1, 92.4], labels: ["Q4 FY25", "Q1 FY26", "Q2 FY26", "Q3 FY26"]
+  },
+  {
+    key: "nrr", title: "Net Revenue Retention (NRR)", value: 112.8, prior: 109.6, target: 110,
+    def: "Starting ARR plus expansion, minus churn and contraction, divided by starting ARR.",
+    trend: [106.2, 108.1, 109.6, 112.8], labels: ["Q4 FY25", "Q1 FY26", "Q2 FY26", "Q3 FY26"]
+  }
+];
+
+const STAGES = [
+  { name: "Start-up",    color: "--series-1", customers: 142, score: 63, healthy: 71, atRisk: 46, critical: 25 },
+  { name: "Scale-up",    color: "--series-2", customers: 96,  score: 71, healthy: 58, atRisk: 28, critical: 10 },
+  { name: "Mid-market",  color: "--series-3", customers: 61,  score: 76, healthy: 41, atRisk: 15, critical: 5 },
+  { name: "Enterprise",  color: "--series-4", customers: 23,  score: 82, healthy: 18, atRisk: 4,  critical: 1 }
+];
+
+const tip = document.getElementById("tip");
+function showTip(html, x, y) {
+  tip.innerHTML = html;
+  tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  let left = x + 14, top = y + 14;
+  if (left + r.width > innerWidth - 8) left = x - r.width - 14;
+  if (top + r.height > innerHeight - 8) top = y - r.height - 14;
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+}
+function hideTip() { tip.style.opacity = 0; }
+const row = (k, v) => `<div class="row"><span>${k}</span><span>${v}</span></div>`;
+
+// KPI tiles with a quarterly sparkline
+const kpiRow = document.getElementById("kpis");
+KPIS.forEach(k => {
+  const delta = (k.value - k.prior).toFixed(1);
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <h2>${k.title}</h2>
+    <div class="kpi-value">${k.value.toFixed(1)}%</div>
+    <div class="kpi-meta">
+      <span class="delta-up">${delta} pts vs last quarter</span>
+      <span>Target ${k.target}%</span>
+    </div>
+    <svg class="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-label="${k.title} by quarter"></svg>
+    <div class="kpi-def">${k.def}</div>`;
+  kpiRow.appendChild(card);
+
+  const svg = card.querySelector("svg");
+  const lo = Math.min(...k.trend, k.target) - 1, hi = Math.max(...k.trend, k.target) + 1;
+  const W = 300, H = 56, pad = 6;
+  const x = i => pad + i * (W - pad * 2) / (k.trend.length - 1);
+  const y = v => H - pad - (v - lo) / (hi - lo) * (H - pad * 2);
+  const pts = k.trend.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  svg.innerHTML = `
+    <line x1="0" x2="${W}" y1="${y(k.target)}" y2="${y(k.target)}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    ${k.trend.map((v, i) => `<rect x="${x(i) - 30}" y="0" width="60" height="${H}" fill="transparent" data-i="${i}"/>`).join("")}`;
+  svg.querySelectorAll("rect").forEach(r => {
+    const i = +r.dataset.i;
+    r.addEventListener("mousemove", e => showTip(`<b>${k.labels[i]}</b>${row(k.key.toUpperCase(), k.trend[i].toFixed(1) + "%")}${row("Target", k.target + "%")}`, e.clientX, e.clientY));
+    r.addEventListener("mouseleave", hideTip);
+  });
+});
+
+// Pie: slices = share of customers per stage
+const total = STAGES.reduce((s, d) => s + d.customers, 0);
+const pieEl = document.getElementById("pie");
+const S = 300, cx = S / 2, cy = S / 2, R = 140;
+let a0 = -Math.PI / 2;
+const paths = STAGES.map((d, i) => {
+  const a1 = a0 + d.customers / total * Math.PI * 2;
+  const large = a1 - a0 > Math.PI ? 1 : 0;
+  const p = `M${cx},${cy} L${cx + R * Math.cos(a0)},${cy + R * Math.sin(a0)} A${R},${R} 0 ${large} 1 ${cx + R * Math.cos(a1)},${cy + R * Math.sin(a1)} Z`;
+  const mid = (a0 + a1) / 2;
+  const lx = cx + R * 0.64 * Math.cos(mid), ly = cy + R * 0.64 * Math.sin(mid);
+  a0 = a1;
+  const pct = Math.round(d.customers / total * 100);
+  return `<g class="slice" data-i="${i}">
+      <path d="${p}" fill="var(${d.color})" stroke="var(--surface-1)" stroke-width="2" stroke-linejoin="round"/>
+      <text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" fill="#0b0b0b" pointer-events="none">${pct}%</text>
+    </g>`;
+});
+pieEl.innerHTML = `<svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Pie chart of customers by stage">${paths.join("")}</svg>`;
+
+// Table doubles as the legend and the accessible data view
+const tbody = document.querySelector("#health-table tbody");
+STAGES.forEach((d, i) => {
+  const tr = document.createElement("tr");
+  tr.dataset.i = i;
+  tr.innerHTML = `
+    <td><span class="swatch" style="background:var(${d.color})"></span>${d.name}</td>
+    <td>${d.customers}</td>
+    <td class="score">${d.score}</td>
+    <td><span class="st st-good"><i>●</i>${d.healthy}</span></td>
+    <td><span class="st st-warn"><i>▲</i>${d.atRisk}</span></td>
+    <td><span class="st st-crit"><i>■</i>${d.critical}</span></td>`;
+  tbody.appendChild(tr);
+});
+const sum = k => STAGES.reduce((s, d) => s + d[k], 0);
+const wavg = Math.round(STAGES.reduce((s, d) => s + d.score * d.customers, 0) / total);
+const tfoot = document.createElement("tfoot");
+tfoot.innerHTML = `<tr style="font-weight:600"><td>All customers</td><td>${total}</td><td class="score">${wavg}</td><td>${sum("healthy")}</td><td>${sum("atRisk")}</td><td>${sum("critical")}</td></tr>`;
+document.getElementById("health-table").appendChild(tfoot);
+
+function highlight(i) {
+  tbody.querySelectorAll("tr").forEach(tr => tr.classList.toggle("hl", tr.dataset.i == i));
+}
+pieEl.querySelectorAll(".slice").forEach(g => {
+  const d = STAGES[+g.dataset.i];
+  g.addEventListener("mousemove", e => {
+    highlight(g.dataset.i);
+    showTip(`<b>${d.name}</b>${row("Customers", `${d.customers} (${Math.round(d.customers / total * 100)}%)`)}${row("Avg health score", d.score)}${row("Healthy", d.healthy)}${row("At risk", d.atRisk)}${row("Critical", d.critical)}`, e.clientX, e.clientY);
+  });
+  g.addEventListener("mouseleave", () => { highlight(-1); hideTip(); });
+});
+</script>
+</body>
+</html>
